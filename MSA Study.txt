@@ -1,0 +1,167 @@
+MAS
+    각 서비스간 Network 를 통해, 보통 HTTP 통해 연동
+    독립된 배포 단위
+    각 마이크로 서비스마다 DB를 갖고있다. 이들의 통신은 HTTP를 통해서 한다
+
+#Hystrix - Circuit Breaker
+    Failure as a First Class Citizen ((요청)실패를 1급시민 객채처럼)
+
+@HystrixCommand
+    -Circuit Open : Circuit이 오픈된 Method는 (주어진 시간동안) 호출이 제한되며, 즉시 에러를 반환한다.
+    -Why? 특정 외부 시스템에서 계속 에러를 발생 시킨다면, 지속적인 호출이 에러 상황을 더욱 악화시킨다.
+    -So! 장애를 유발하는 (외부)시스템에 대한 연동을 조기에 차단 (Fail Fast) 시키믕로서 나의 시스템을 보호한다.
+    기본값: 10초동안 20개 이상의 호출이 발생 했을대 50% 이상의 호출에서 에러가 발생하면 Circuit Open
+        -application.yml 설정 가능
+    Circuit이 오픈된 경우의 에러 처리 - Fallback
+    @HystrixCommand(commandKey='Ext', fallbackMethod='recommendFallback', commandProperties={설정값(타임아웃시간) 세팅 가능 })
+
+    타임아웃 default 1,000ms
+        -application.yml 에서 타임아웃 시간 설정 가능
+
+적용방법
+    1. gradle - hystirx dependency 추가
+    2. Application(MainClass) 에 @EnableCircuitBreaker 추가
+    3. 다른 서비스 호출하는 Method 에 @HystrixCommand 추가
+
+Hystrix에서 Fallback의 실행 여부는 Exception이 발생 했는가 여부
+Fallback 의 정의 여부는 Circuit Breaker Open 과 무관
+Throwable 파라미터의 추가로 Fallback 원인을 알 수 있다
+
+
+# Ribbon - Client LoadBalancer
+로드밸런식 방식 : 라운드로빈(순차실행)
+interceptors 기반으로 작동
+적용방법
+    1. gradle - ribbon dependency 추가
+    2. Application(MainClass) RestTemplate 빈에  @LoadBalanced 추가
+    3. 호출하는 곳에서 domain 주소 제거하고 설정한 {이름}으로 변경
+    4. application.yml에 rebbon 설정 추가
+        {이름}:
+            ribbbon:
+                listOfServers: localhost:8082
+Retry 기능
+    1. gradle - retry dependency 추가
+    2. application.yml에 retry 설정 추가
+        {이름}:
+            ribbbon:
+                listOfServers: localhost:8082, {서버추가}
+                MaxAutoRetries: 0
+                MaxAutoRetriesNextServer: 1
+    3. 적용됐는지 확인이 어려울경우 Debug 로 restTemplate 호출하는곳에 interceptors 이름이 RetryInterceptors 인지 확인
+
+    주의:
+    -Retry를 시도하다가도 HystrixTimeout이 발생하면, 즉시 에러를 리턴할 것이다.
+    (Hystrix로 Ribbon을 감싸서 호출한 상태이면)
+    -Retry를 끄거나, 재시도 횟수를 0으로 하여도 해당 서버로의 호출이 항상 동일한 비율료. 실패하지는 않는다. ??
+    -classpath 에 retry가 존재해야 한다는점 주의 ??
+
+유레카와 사용할 경우 아주 강력하다
+
+#Eureka - Service Registry
+Ribbon 에서 서버 목록을 yml에 직접 넘었는데 자동화 할 수 있다.
+'서버가 새롭게 시작되면 그것을 감지하여 목록에 자동으로 추가되고, 서버가 종료되면 자동으로 목록에서 삭제하기 위한 방법'
+
+큰의미로 Service Registry 이다 (Consul도 있다)
+적용방법
+Client
+    내 서버 정보 등록하기
+    내가 호출의 대상이 되고싶을때
+    1. gradle - eureka-client dependency 추가
+    2. Application(MainClass)에 @EnableEurekaClient 추가
+    3. application.yml 에 유레카 서버 등록
+        eureka:
+            client:
+                serviceUrl:
+                    defaultZone:http://127.0.0.1:8761/eureka/  # default address
+        eureka:instance:prefer-ip-address: true
+            선택사항 (테스트용) os에서 제공하는 HOSTNAMEㄷ신 자신의 IP address를 사용하여 등록하는 설정
+    4. Ribbon 에서 설정한 product:ribbon:listOfServers: 설정 제거
+
+유레카 서버
+    1. gradle - eureka-server dependency 추가
+    2. Application(MainClass)에 @EnableEurekaServer 추가
+
+    유레카서버 2중화는 간단하다. 구글 검색해봐라
+
+유레가 작동 원리
+    -서버 시작 시 Eureka Server(Registry) 에 자동으로 자신의 상태를 등록(UP)
+    -주기적으로 HeartBeat 으로 Eureka Server에 자신이 살아 있음을 알림 (기본30초)
+    -서버 종료 시 Eureka Server 에 자신의 상태 변경(DOWN) 혹은 자신의 목록 삭제
+    -Eureka 상에 등록된 이름은 'spring.application.name'
+    -각 클라이언트는 자신의 로컬의 유레카 서버목록을 30초마다 갱신해서 가지고있기때문에 (다른 서비트 호출할때마다  유레카 서버를 호출하는게 아님) 부하도 없다.
+
+#Feign - Declarative Http Client
+    Interface 선언을 통해 자동으로 Http Client 를 생성
+    스프링 restTemplate 를 대체함
+
+적용방법
+    1. gradle - openfeign dependency 추가
+    2. Application(MainClass)에 @EnableFeignClients 추가
+    3. 서비스를 interface 로 선언하여 생성한다. (예: FeignProductRemoteService)
+        생성한 인터페이스에 @FeignClient(name= "product", url = "http://localhost:8080/") 를 추가
+        @RequestMapping 를 생성한다 (컨트롤러가 아닌 서비스단에 생성하는게 특이하다)
+    4. Feign 서비스를 사용할 컨트롤러에 (예: ProductRemoteServiceImpl) 를 추가한다.
+        restTemplate 를 사용하던것을 FeignProductRemoteService 를 사용하도록 한다.
+
+Feign 의 동작
+    @FeignClient 에 URL 명시 시
+        - 순수 Feign Client로서만 작동
+          Ribbon, Eureka, Hystrix 를 사용하지 않는다
+
+    @FeignClient 에 URL 명시 하지 않으면
+        - Feign + Ribbon + Eureka + Hystrix 모두 사용
+          서버 호출 ? FeignClient(name= "product")
+            eureka 에서 product 서버 목록을 조회해서 ribbon을 통해
+            load-balancing 하면서 HTTP 호출을 수행행
+
+    Hystrix 사용하려면
+    application.yml 에 feign:hystrix:enabled: true 설정
+    위의 설정이 들어가면 메소드 하나 하나가 Hystrix Command 감싼것으로 호출됨
+
+    Hystrix Fallback 설정
+    -Feign 으로 정의한 Interface를 직접 구현하고 Spring Bean으로 선언
+    -Fallback 클래스를 @Feign 선언시 명시
+        @FeignClient(fallback=someFallback.class, name= "product", url = "http://localhost:8080/")
+    -단점 에러를 확인하기가 어렵다. FallbackFactory 를 사용하면 에러원인을 확인 가능하다.
+
+Feign용 Hystrix 프로퍼티 정의하는 법
+    youtube -T아카데미 [토크ON세미나] MSA 7강 16분 참고 https://www.youtube.com/watch?v=SOmn6BGL884&list=PL8uODMusPkrJmjqi0ByJ8UYTFuvKvS-MJ&index=7
+
+# Zuul (Spring Cloud Zuul) - API Gateway
+    -상용에서는 이중화를 필수로 한다. (ex: L4, elb)
+    외부에서 URL 하나는 알아야 하는데 이것을 Zuul이 해결해줌
+    클라이언트와 백엔드 서버 사이의 출입문(front door)
+    라우팅(라우팅, 필터링, API변환, 클라이언트 어앱터 API 서비스 프록시)
+    횡단 관심사 cross-service concerns
+
+    1. Zuul의 모든 API 요청은 HystrixCommand로 구성되어 전달된다.
+        -각 API 경로 (서버군) 별로 Circuit Breaker 생성
+        -하나의 서버군이 장애를 일으켜도 다른 서버군의 서비스에는 영향이 없다.
+        -CircuitBreaker / ThreadPool 의 다양한 속성을 통해 서비스 별 속성에 맞는 설정 가능
+    2. API를 전달할 서버의 목록을 갖고 Ribbon 을 통해 Load-Balancing을 수행한다.
+    3. Eureka Client를 사용하여 주어진 URL의 호출을 전달할 '서버리스트' 를 찾는다
+    4. Eureka + Ribbon 에 의해서 결정된 Server 주소로 HTTP 요청청
+    5. 선택된 첫 서버로의 호출이 실패할 경우 Ribbon에 의해서 자동으로 Retry 수행
+
+사용방법
+    1. gradle - Zuul, Eureka, retry dependency 추가
+    2. Application(MainClass)에 @EnableZuulProxy, @EnableDiscoveryClient(@EnableEurekaClient 추상화한것) 추가
+    3. application.yml 에 zuul, Eureka 설정 추가
+
+Spring Cloud Config Server 서버 구성
+    중앙화된 설정 서버
+    공부해야함
+
+Zipkin, Spring Cloud Sleuth
+    트레이싱 제공
+    공부해야함
+
+
+추후 참고해야할 키워드
+Database 분리방법, 분산트랜잭션, 보상트랜잭션, 이벤트 드리븐
+
+
+
+
+
+
