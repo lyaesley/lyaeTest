@@ -1,0 +1,117 @@
+
+사용할 컴포넌트에서 state, getters 값을 사용하기 위래 아래 import 로 불러온다
+import { mapState, mapGetters } from 'vuex'
+
+STATE
+    - 사용할 components 에서 computed 영역에서 불러올수있음
+        ...mapState(['someState'])
+
+GETTERS
+    - Vue 의 computed 와 대응
+    - STATE 의 값을 가공하고자 할때 작성함
+        vuex 설정파일에 작성
+        getters: {
+            keyGettersName1: state => {        //애로우 펑션 사용가능
+                return state.nameState.length
+            },
+            keyGettersName2: function(state) { //기본 사용
+                return state.nameState.lenght
+            },
+            keyGettersName3: (state, getters) => { //getters 함수에서 같은 getters를 호출할때 두번째 인자로 사용가능
+                return keyGettersName1 + keyGettersName2
+            }
+            
+        }  
+
+    - 사용할 components 에서 computed 영역에서 불러올수있음
+        components 에 작성
+        computed: {  Vuex의 getters 의 값을 사용하기 위해서는 ...mapGetters (약속된 명령어) 를 사용
+            ...mapGetters({
+                keyName1: 'someGetters1', 
+                keyName2: 'someGetters2', 
+                keyName3: 'someGetters3'
+                }) //map 형태로 불러옴
+            ...mapGetters(['someGetters1', 'someGetters2', 'someGetters3']) //array 형태로 불러옴
+        }
+
+MUTATIONS 
+    STATE 를 변화하고 관리할때 사용
+
+    Q. components 에서도 STATE 값을 변경 할 수 있는데 왜 MUTATIONS 에서 해야하는가?
+    A. 같은 기능을 하는 함수를 MUTATIONS에 만들어놓고 각각의 components 내에서 호출. 명령어(commit)
+
+    사용할 components 에서 Mutations 를 사용하기 위해 import 
+    import { mapMutations } from 'vuex'
+
+    vuex 설정파일에 작성
+    mutations: {
+        addUsers: (state, payload) => { //payload 컴포넌트에서 전달한 값을 두번째 인자로 받는다.
+            state.allUsers.push(payload)
+        }
+    }
+
+    components 에 작성
+    mehtods: {
+        ...mapMutations(['addUsers']), // 이런식으로 불러온다
+        sighUp() {
+            let userObj = {1,2,3,}
+            this.addUsers(userObj)   //위에 ..mapMutations(['addUsers']) 로 가져온 addUsers 사용
+        }
+
+        ...mapMutations(['addUsers']) 이런방식을 사용하지 않고 바로 실행 할 수 있다
+        this.$store.commit('addUsers', userObj) //vuex Mutations 에서 addUser 란 것을 찾고 payload 로 userObj 인자를 넘긴다.
+    }
+
+ACTIONS
+    MUTATIONS 을 필요에 의해 기능을 제한함
+    MUTATIONS은 모든 기능이 동기로 동작함 (비동기 로직으로 동시에 같은 STATE 값에 접근할 경우 순서를 매길수 없다)
+    그래서 비동기 로직은 ACTIONS 에서 처리함
+
+    MUTATIONS 을 동작시키는 비즈니스 로직을 ACTIONS 에 작성
+    
+    components 에서 Actions 를 실행시키는 명령어는 dispatch (신호를 보낸다는 의미)
+    Actions 에서 Mutations 으로 commit
+    Mutations dptj State 를 변경
+
+    vuex 설정파일에 작성
+    actions: {
+        //mutations 에 작성한 이름과 이름이 같아도 무방하다 (사용하는 방법이 다르기 때문에)
+        addUsers: (context, payload) => {      //context 로 사용하는 방법
+            context.commit('addUsers', payload)
+        }
+        
+        //context 인자를 자주 사용할경우 다른 방법
+
+        addUser: ({commit}, payload) => {
+            commit('addUsers', payload)
+        }
+
+    }
+
+    components 에 사용하는법
+    methods: {
+        this.$store.dispatch('addUsers', userObj)
+    }
+
+    // mapActions 사용
+    import { mapActions } from 'vuex'
+    methods: {
+        //...mapMutations(['addUsers']) //store 내에서 mutations, actions 에서 함수 이름은 중복되지만 사용할 components에서는 중복될 수 없다.
+        ...mapActions(['addUsers'])
+        this.addUsers(userObject);
+    }
+
+
+
+
+vuex 작동 흐름
+State -> getters -> components (dispatch)-> Actions (commit)-> Mutations -> State
+
+
+
+    
+
+
+
+
+
