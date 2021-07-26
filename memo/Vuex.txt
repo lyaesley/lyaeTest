@@ -104,7 +104,7 @@ ACTIONS
 
 
 
-vuex 작동 흐름
+#vuex 작동 흐름
 State -> getters -> components (dispatch)-> Actions (commit)-> Mutations -> State
 
 
