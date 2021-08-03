@@ -80,7 +80,7 @@ ACTIONS
             context.commit('addUsers', payload)
         }
         
-        //context 인자를 자주 사용할경우 다른 방법....
+        //context 인자를 자주 사용할경우 다른 방법.....
 
         addUser: ({commit}, payload) => {
             commit('addUsers', payload)
