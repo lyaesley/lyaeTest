@@ -65,7 +65,7 @@ MUTATIONS
 ACTIONS
     MUTATIONS 을 필요에 의해 기능을 제한함
     MUTATIONS은 모든 기능이 동기로 동작함 (비동기 로직으로 동시에 같은 STATE 값에 접근할 경우 순서를 매길수 없다)
-    그래서 비동기 로직은 ACTIONS 에서 처리함
+    그래서 비동기 로직은 ACTIONS 에서 처리함.
 
     MUTATIONS 을 동작시키는 비즈니스 로직을 ACTIONS 에 작성
     
